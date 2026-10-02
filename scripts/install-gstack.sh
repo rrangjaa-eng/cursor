@@ -14,9 +14,43 @@ fi
 GSTACK_DIR="$HOME/.claude/skills/gstack"
 DONE_MARKER="$GSTACK_DIR/.install-gstack-done"
 
+# (ERP_PLANT8_260917 scripts/install_pkgs.sh에서 가져옴)
+# Chromium for /browse, /qa, /design-review: the cloud VM ships Playwright
+# browsers under $PLAYWRIGHT_BROWSERS_PATH, but not the revision the caller's
+# playwright expects, and the Playwright CDN is not reachable through the
+# proxy. Link the expected headless-shell revision to the preinstalled one.
+# Verified: goto/text/screenshot work with Chromium 141 under playwright 1.62.
+link_chromium_headless_shell() {
+  local browsers_json="$1"
+  local pw="${PLAYWRIGHT_BROWSERS_PATH:-}"
+  if [ -z "$pw" ] || [ ! -d "$pw" ] || [ ! -f "$browsers_json" ]; then
+    return 0
+  fi
+  local rev
+  rev="$(node -e '
+    const b = require(process.argv[1]).browsers;
+    const e = b.find(x => x.name === "chromium-headless-shell") || b.find(x => x.name === "chromium");
+    if (e) process.stdout.write(String(e.revision));' "$browsers_json" 2>/dev/null || true)"
+  local want="$pw/chromium_headless_shell-${rev}/chrome-headless-shell-linux64/chrome-headless-shell"
+  if [ -n "$rev" ] && [ ! -e "$want" ]; then
+    local have
+    have="$(find "$pw" -maxdepth 3 -type f \( -name chrome-headless-shell -o -name headless_shell \) 2>/dev/null | head -1)"
+    if [ -n "$have" ] && mkdir -p "$(dirname "$want")" 2>/dev/null; then
+      ln -sfn "$have" "$want" \
+        && touch "$pw/chromium_headless_shell-${rev}/INSTALLATION_COMPLETE" \
+                 "$pw/chromium_headless_shell-${rev}/DEPENDENCIES_VALIDATED" \
+        && echo "install_pkgs: linked Playwright chromium_headless_shell-${rev} -> $have"
+    else
+      echo "install_pkgs: no preinstalled headless Chromium found; browser skills unavailable this session" >&2
+    fi
+  fi
+}
+
+
 # 멱등: setup까지 끝난 설치가 있으면(resume 등) 건너뛴다. 업데이트는 gstack 자체 훅이 맡는다.
 # 표식이 없는 디렉터리는 중간에 끊긴 설치이므로 지우고 다시 받는다.
 if [ -f "$DONE_MARKER" ]; then
+  link_chromium_headless_shell "$GSTACK_DIR/node_modules/playwright-core/browsers.json"
   echo "install-gstack: already installed ($(cat "$GSTACK_DIR/VERSION" 2>/dev/null)) — skipping"
   exit 0
 fi
@@ -41,6 +75,7 @@ fi
 # 팀 모드 setup이 켜는 세션 시작 자동 업그레이드를 끈다(고정 버전 유지).
 "$GSTACK_DIR/bin/gstack-config" set auto_upgrade false >/dev/null 2>&1 || true
 
+link_chromium_headless_shell "$GSTACK_DIR/node_modules/playwright-core/browsers.json"
 touch "$DONE_MARKER"
 echo "install-gstack: installed gstack $(cat "$GSTACK_DIR/VERSION" 2>/dev/null) (team mode)"
 exit 0
