@@ -1,0 +1,11 @@
+{
+  "timeZone": "Asia/Seoul",
+  "runtimeVersion": "V8",
+  "exceptionLogging": "STACKDRIVER",
+  "dependencies": {
+    "enabledAdvancedServices": [
+      { "userSymbol": "Drive", "serviceId": "drive", "version": "v3" },
+      { "userSymbol": "Tasks", "serviceId": "tasks", "version": "v1" }
+    ]
+  }
+}
