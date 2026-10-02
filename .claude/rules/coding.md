@@ -1,9 +1,9 @@
 ---
 paths:
-  - "**/*.{ts,tsx,js,jsx,mjs,cjs,py,go,rs,java,kt,swift,php,rb,sh,ps1,sql,css,scss,html,vue,svelte}"
+  - "**/*.{ts,tsx,js,jsx,mjs,cjs,py,go,rs,java,kt,swift,php,rb,sh,ps1,sql,css,scss,html,vue,svelte,gs}"
 ---
 
-<!-- rrangjaa-eng/dotfiles@d78d1ad에서 복사함. 여기서 고치지 말고 dotfiles에서 고친 뒤 다시 복사 -->
+<!-- rrangjaa-eng/dotfiles@4f8bcfc에서 복사함. 여기서 고치지 말고 dotfiles에서 고친 뒤 다시 복사 -->
 
 # 코딩 원칙
 

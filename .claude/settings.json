@@ -34,6 +34,18 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/scripts/install-gstack.sh",
+            "timeout": 780
+          }
+        ]
+      }
     ]
   }
 }
