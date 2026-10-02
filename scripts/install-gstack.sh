@@ -14,6 +14,24 @@ fi
 GSTACK_DIR="$HOME/.claude/skills/gstack"
 DONE_MARKER="$GSTACK_DIR/.install-gstack-done"
 
+# 클라우드 프록시는 자체 CA로 TLS를 다시 서명한다. Chromium은 시스템 CA가 아니라
+# NSS 저장소(~/.pki/nssdb)를 보므로 거기에 프록시 CA를 등록해야 /browse가 열린다
+# (없으면 net::ERR_CERT_AUTHORITY_INVALID). certutil은 libnss3-tools에 있다.
+trust_agent_proxy_ca() {
+  local ca="/root/.ccr/agent-proxy-ca.crt" db="sql:$HOME/.pki/nssdb"
+  [ -f "$ca" ] || return 0
+  if ! command -v certutil >/dev/null 2>&1; then
+    { timeout 200 apt-get install -y -q libnss3-tools \
+      || { timeout 200 apt-get update -q && timeout 200 apt-get install -y -q libnss3-tools; }; } >/dev/null 2>&1 \
+      || { echo "install-gstack: libnss3-tools install failed — /browse may hit certificate errors" >&2; return 0; }
+  fi
+  mkdir -p "$HOME/.pki/nssdb"
+  [ -f "$HOME/.pki/nssdb/cert9.db" ] || certutil -N -d "$db" --empty-password >/dev/null 2>&1
+  certutil -L -d "$db" -n agent-proxy-ca >/dev/null 2>&1 \
+    || certutil -A -d "$db" -t "C,," -n agent-proxy-ca -i "$ca" >/dev/null 2>&1 \
+    || echo "install-gstack: proxy CA registration failed — /browse may hit certificate errors" >&2
+}
+
 # (ERP_PLANT8_260917 scripts/install_pkgs.sh에서 가져옴)
 # Chromium for /browse, /qa, /design-review: the cloud VM ships Playwright
 # browsers under $PLAYWRIGHT_BROWSERS_PATH, but not the revision the caller's
@@ -51,6 +69,7 @@ link_chromium_headless_shell() {
 # 표식이 없는 디렉터리는 중간에 끊긴 설치이므로 지우고 다시 받는다.
 if [ -f "$DONE_MARKER" ]; then
   link_chromium_headless_shell "$GSTACK_DIR/node_modules/playwright-core/browsers.json"
+  trust_agent_proxy_ca
   echo "install-gstack: already installed ($(cat "$GSTACK_DIR/VERSION" 2>/dev/null)) — skipping"
   exit 0
 fi
@@ -76,6 +95,7 @@ fi
 "$GSTACK_DIR/bin/gstack-config" set auto_upgrade false >/dev/null 2>&1 || true
 
 link_chromium_headless_shell "$GSTACK_DIR/node_modules/playwright-core/browsers.json"
+trust_agent_proxy_ca
 touch "$DONE_MARKER"
 echo "install-gstack: installed gstack $(cat "$GSTACK_DIR/VERSION" 2>/dev/null) (team mode)"
 exit 0
