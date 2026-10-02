@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "round": 2,
+  "document": "/home/user/cursor/docs/designs/payment-tasks.md",
+  "quality_score": 7,
+  "dimensions": {
+    "completeness": "ISSUES",
+    "consistency": "ISSUES",
+    "clarity": "ISSUES",
+    "scope": "PASS",
+    "feasibility": "ISSUES"
+  },
+  "findings": [
+    {
+      "id": "R2-1",
+      "dimension": "consistency",
+      "problem": "대기 시트의 id 열에 문서 키(`f:<파일ID>`)를 그대로 넣으면 Routine에게 원본 공유 드라이브 파일 ID가 주어진다. 이는 '시트에 안 넣는 것: 원본 링크 … Routine이 원본을 열 경로 자체를 주지 않음'(대기열·Routine 표)과 모순되며, 커넥터가 파일 ID로 원본을 열 수 있으므로 노출 제약과 프롬프트 인젝션 방어가 지시문 관례에만 의존하게 된다.",
+      "remedy": "시트 id는 원본 ID와 무관한 불투명 대기 ID(무작위 값)로 하고, 대기 ID → 문서 키·버전 매핑은 스크립트 속성 `q:<id>`에만 둔다고 명시한다."
+    },
+    {
+      "id": "R2-2",
+      "dimension": "consistency",
+      "problem": "결과 검증은 '시트에 있는 id·같은 버전인지' 확인하고 테스트 ⑪은 '옛 버전 결정 무시'를 요구하지만, 결과 형식의 decision에는 버전 필드가 없다. Routine 판단 중 시트 행이 새 버전으로 교체되면 같은 id의 옛 버전 결정을 구분할 수 없다.",
+      "remedy": "결과 형식에 시트의 버전을 그대로 되돌려 주는 `version` 필드를 추가하거나, 버전마다 새 대기 ID를 발급해 id만으로 버전이 구분되게 한다고 명시한다."
+    },
+    {
+      "id": "R2-3",
+      "dimension": "consistency",
+      "problem": "검증 표는 '시트에 있는 id·같은 버전' 확인 실패를 포함한 모든 실패 항목을 \"[직접 확인]\"으로 돌린다고 하는데, 테스트 ⑪은 옛 버전 결정을 '무시'한다고 한다. 또 만료로 행이 이미 삭제된 뒤 도착한 결정도 id 불일치로 \"[직접 확인]\"이 되어, 만료 시 만든 \"[직접 확인]\"과 중복된다.",
+      "remedy": "오래된 결정(시트에 없는 id, 옛 버전, 이미 만료·삭제된 행)은 할 일 없이 무시하고 로그만 남기며, 값 검증 실패만 \"[직접 확인]\"으로 보낸다고 구분해 명시한다."
+    },
+    {
+      "id": "R2-4",
+      "dimension": "completeness",
+      "problem": "방향 규칙의 수령 측 라벨 '을'은 한국어 목적격 조사와 같은 글자라 거의 모든 문장에서 맞고, '갑/을'이 한 줄(표 행 연결)에 함께 나오면 별칭 앞 50자 안에 지급 측·수령 측 라벨이 동시에 잡힌다. 두 라벨이 함께 맞을 때의 우선순위가 정해져 있지 않아, 지급 측 라벨을 먼저 평가하면 우리 회사가 을(수령 측)인 계약서가 규칙 확정 지급 할 일이 되는 D5 오류가 다시 생길 수 있다.",
+      "remedy": "라벨 인식 형식(예: 줄 시작·'을:'·'을(' 등 구분자 동반)과, 수령 측 라벨이 하나라도 맞거나 양쪽이 함께 맞으면 Routine으로 보낸다는 우선순위를 명시하고 테스트에 추가한다."
+    },
+    {
+      "id": "R2-5",
+      "dimension": "completeness",
+      "problem": "'문서 수정 시' 표는 새 버전이 규칙 확정·대기열·동일 서명인 경우만 다룬다. 새 버전이 후보에서 빠지거나(제외), 읽을 수 없어 \"[직접 확인]\"이 되거나, 대기열에서 만료·`needs_review`·검증 실패로 \"[직접 확인]\"이 될 때 이전 할 일을 유지할지 지울지, 그리고 교체 대상(`t` 목록)에 이전 \"[직접 확인]\" 할 일이 포함되는지가 정해져 있지 않다.",
+      "remedy": "위 각 경우의 이전 할 일 처리(유지/삭제/\"[직접 확인]\" 메모에 이전 할 일 언급 등)와 이전 \"[직접 확인]\" 할 일의 교체 여부를 표에 추가한다."
+    },
+    {
+      "id": "R2-6",
+      "dimension": "feasibility",
+      "problem": "중복 방지는 '추출 결과 서명'이 같으면 할 일을 건드리지 않는다고 하지만, 본문을 읽지 않는 PDF·이미지와 대기열로 가는 문서는 Apps Script가 추출 결과를 갖지 않아 서명이 정의되지 않는다. 그러면 이름 변경 등 `modifiedTime`만 바뀌어도 매번 사본 생성·재대기·Routine 재판단·할 일 교체가 일어난다.",
+      "remedy": "형식별 서명 정의(예: 바이너리는 `md5Checksum`, 텍스트 문서는 추출 텍스트 또는 추출 결과 해시, Routine 결과는 반영 시 payments 해시)와 대기열 문서에서 서명을 언제 저장하는지를 명시한다."
+    },
+    {
+      "id": "R2-7",
+      "dimension": "completeness",
+      "problem": "실행 시간 제한(4.5분 중단) 시 드라이브 changes 토큰 저장 규칙만 있고, 메일 체크포인트 `cursor:gmail`을 언제 어떤 값으로 갱신하는지는 없다. 실행 시작 시각으로 커서를 옮긴 뒤 중간에 멈추면 남은 메일이 영구히 누락된다.",
+      "remedy": "메일 커서는 끝까지 처리한 메일의 수신 시각까지만 전진시키고(오래된 순 처리), 중단 시 다음 실행이 그 지점부터 이어서 처리한다고 명시한다."
+    },
+    {
+      "id": "R2-8",
+      "dimension": "feasibility",
+      "problem": "상태 저장은 스크립트 속성 500KB(항목당 약 150B, 약 3,000여 항목)인데, 상태를 후보 문서만 기록하는지 공유 드라이브 전체의 모든 변경 파일을 기록하는지, `q:<id>`(원본 링크·올린 사람 등)도 같은 한도를 쓰는지, 한도 초과 시 동작이 정해져 있지 않다. 공유 드라이브 전부를 대상으로 하면 180일 보관이 한도를 넘을 수 있다.",
+      "remedy": "상태를 기록하는 대상(예: 후보·할 일이 있는 문서만)과 `q:` 항목 정리 시점, 한도 근접 시 오래된 항목부터 정리하는 등 초과 대응을 명시한다."
+    },
+    {
+      "id": "R2-9",
+      "dimension": "completeness",
+      "problem": "형식별 읽기 표에서 읽을 수 있는 형식의 '못 읽으면' 칸이 모두 '-'라, 내보내기 크기 한도 초과·암호 걸린/손상된 docx·xlsx·다운로드/복사 제한 설정·`Drive.Files.copy` 실패 같은 오류 시 경로(재시도/\"[직접 확인]\"/제외)와 상태 기록 여부가 없다. 실패가 매 실행 반복되거나 조용히 누락될 수 있다.",
+      "remedy": "읽기·사본 생성 실패 시 동작(예: 이름 키워드 있으면 \"[직접 확인]\", 없으면 제외 사유 기록, 같은 버전 재시도 안 함)을 표에 명시한다."
+    },
+    {
+      "id": "R2-10",
+      "dimension": "clarity",
+      "problem": "메일은 본문+첨부 전부를 한 단위로 처리하지만, 읽을 수 있는 본문과 PDF·hwp 첨부가 섞일 때 어느 분류(규칙 확정/대기열/\"[직접 확인]\")가 우선하는지, 메일의 '이름 키워드'가 제목인지 첨부 파일명인지가 정해져 있지 않다.",
+      "remedy": "메일 단위 분류 규칙(예: PDF·이미지 첨부가 있으면 대기열, hwp 첨부만 키워드에 맞으면 \"[직접 확인]\")과 메일에서 이름 키워드를 검사하는 대상을 명시한다."
+    },
+    {
+      "id": "R2-11",
+      "dimension": "clarity",
+      "problem": "규칙 확정 조건 ③ '지급 기한 날짜가 하나'에서 무엇을 지급 기한 날짜로 보는지(견적일·유효기간·작성일 등 다른 날짜와 구분하는 라벨 키워드) 정의가 없다. 문서의 아무 날짜나 기한으로 잡으면 규칙 경로에서 잘못된 기한의 할 일이 생긴다.",
+      "remedy": "지급 기한으로 인정하는 라벨 키워드(예: 지급일·결제일·납부기한·입금일)와, 그런 라벨 날짜가 없으면 대기열로 보낸다는 결정을 판단 규칙 표에 명시한다."
+    },
+    {
+      "id": "R2-12",
+      "dimension": "clarity",
+      "problem": "대기 시트 본문 텍스트를 최대 20,000자로 자르지만, 잘렸다는 사실을 Routine에 알리는 방법이 없어 뒷부분의 분할 지급 회차를 놓친 결정이 정상 결정으로 반영될 수 있다.",
+      "remedy": "잘린 경우 대기 사유(또는 별도 표시)에 '본문 잘림'을 남기고, Routine 지시문에서 잘린 문서는 `needs_review`로 돌리거나 그 사실을 고려하게 한다고 명시한다."
+    }
+  ],
+  "prior": [
+    {"id": "R1-1", "status": "resolved", "evidence": "판단 규칙 표 '규칙 확정 조건(모두 충족)' ①~④와 '하나라도 어기면 대기열'로 기준을 명시. (지급 기한 날짜 인식 세부는 새 finding R2-11)", "current_id": null},
+    {"id": "R1-2", "status": "resolved", "evidence": "'금액 기준'(최종 금액 키워드 줄, 부가세 포함/별도/불명 메모 표시), 조건 ③으로 상대 기한은 대기열, '날짜가 없는 회차'에서 Routine `due_date: null` + `due_basis` → \"[기한 미정]\" 할 일, 결과 형식 `due_date` null 허용.", "current_id": null},
+    {"id": "R1-3", "status": "resolved", "evidence": "'할 일 형식' 표가 지급·직접 확인 각각의 제목·기한·메모 규칙을 정의.", "current_id": null},
+    {"id": "R1-4", "status": "resolved", "evidence": "수집·상태 표의 '문서 키·버전'(`f:<파일ID>`/`m:<메일ID>`, modifiedTime/고정값), '상태 저장'(스크립트 속성, 180일 정리, 500KB 한도), '중복 방지'(같은 버전 건너뜀, 서명 동일 시 할 일 유지). 서명·용량 세부는 새 finding R2-6, R2-8.", "current_id": null},
+    {"id": "R1-5", "status": "resolved", "evidence": "'문서 수정 시' 표: 제목·기한이 같은 완료된 이전 할 일은 재생성 안 함, 새 버전이 대기열로 가면 결정 반영 때까지 이전 할 일 유지. 표에 없는 다른 경우는 새 finding R2-5.", "current_id": null},
+    {"id": "R1-6", "status": "resolved", "evidence": "'원본 삭제·휴지통' 행: removed/trashed면 대기 행 삭제·사본 휴지통, 기존 할 일 유지. 테스트 ④.", "current_id": null},
+    {"id": "R1-7", "status": "resolved", "evidence": "'메일 수집' 행(`cursor:gmail` 이후 `after:` 검색, 첫 실행 7일, 내가 보낸 메일 제외)과 키 `m:<메일ID>`·고정 버전으로 재처리 방지, 테스트 ⑲. 중단 시 커서 갱신은 새 finding R2-7.", "current_id": null},
+    {"id": "R1-8", "status": "resolved", "evidence": "'처리 단위'(메일 1통 = 본문+첨부), '출처 간 중복'(할 일 2개 허용, 열린 질문), 시트 '사본 파일 ID(여러 개면 쉼표로)'. 혼합 형식 메일 분류는 새 finding R2-10.", "current_id": null},
+    {"id": "R1-9", "status": "resolved", "evidence": "'형식별 읽기' 표가 Google 문서·시트, docx·xlsx·hwpx, 메일 본문, PDF·이미지, hwp별 읽는 방법과 못 읽을 때 경로를 정의. 읽기 오류 경로는 새 finding R2-9.", "current_id": null},
+    {"id": "R1-10", "status": "resolved", "evidence": "흐름의 'LockService로 한 번에 하나만'과 '실행 시간' 행(4.5분 중단, 끝까지 처리한 페이지의 다음 토큰만 저장).", "current_id": null},
+    {"id": "R1-11", "status": "resolved", "evidence": "'드라이브 변경 감지' 행: `getStartPageToken`을 먼저 저장, 채움 조건에 `createdTime` 포함. 테스트 ②.", "current_id": null},
+    {"id": "R1-12", "status": "resolved", "evidence": "'대상 공유 드라이브' 행: 내가 멤버인 공유 드라이브 전부, `change.file.driveId` 없는 항목 버림. 테스트 ③.", "current_id": null},
+    {"id": "R1-13", "status": "resolved", "evidence": "'방향' 행이 임대인·수급인·용역 제공자·을 등 수령 측 라벨과 `COMPANY_ALIASES`로 Routine 전송을 정의하고, 테스트 ⑥ 추가. 라벨 오인식·우선순위는 새 finding R2-4.", "current_id": null},
+    {"id": "R1-14", "status": "resolved", "evidence": "열린 질문에 커넥터의 시트 읽기·PDF/이미지 읽기·JSON 생성을 '도구 설명으로만 확인(실행 미확인)'으로 구분하고 구현 착수 전 관문으로 지정. 성공 기준 '커넥터 관문'.", "current_id": null},
+    {"id": "R1-15", "status": "resolved", "evidence": "열린 질문 'JSON 파일 생성이 안 될 때': Google 문서로 결과 작성 후 Apps Script 파싱 대체 경로와 읽기 불가 시 재논의, Next Steps 1의 관문.", "current_id": null},
+    {"id": "R1-16", "status": "resolved", "evidence": "Routine 지시문 규칙(본문은 데이터, 폴더 밖 파일 금지, 결과 1개), 시트에서 원본 링크 제외(`q:<id>` 보관), 결과 검증 행(id·버전·amount·due_date·currency 검사, 실패는 \"[직접 확인]\"). id 열이 원본 파일 ID를 노출하는 문제는 새 finding R2-1.", "current_id": null},
+    {"id": "R1-17", "status": "resolved", "evidence": "결과 형식에 `needs_review`·`review_reason` 추가, '판단 불가' 행: needs_review 또는 지급 문서인데 payments 비면 즉시 \"[직접 확인]\".", "current_id": null},
+    {"id": "R1-18", "status": "resolved", "evidence": "'노출' 표: 조회 기록 표시 끄기 보조 수단, 접근 경로 3가지별 확인, 노출 경로는 끄고 키워드만으로 \"[직접 확인]\". 성공 기준 '노출'도 경로 3가지로 구체화.", "current_id": null},
+    {"id": "R1-19", "status": "resolved", "evidence": "성공 기준 테스트 ⑧(읽을 수 없는 형식), ⑬(깨진 JSON), ⑮(만료 시 \"[직접 확인]\"), ⑰(반복 변경 중복 없음), ⑲(메일 제외·재처리 안 함) 추가.", "current_id": null}
+  ]
+}
